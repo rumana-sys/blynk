@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend  # Root directory where backend Dockerfile is located
+    container_name: blynk-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    working_dir: /app
+    env_file:
+      - .env
+    command: ["node", "/app/server.js"]
+
+  frontend:
+    build:
+      context: ./frontend  # Root directory where frontend Dockerfile is located
+    container_name: blynk-frontend
+    ports:
+      - "80:80"  # Expose on port 80 (NGINX)
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html
+    depends_on:
+      - backend  # Ensure backend starts first
+    command: [ "nginx", "-g", "daemon off;" ]  # Start NGINX instead of Vite
+
+volumes:
+  backend_node_modules:
