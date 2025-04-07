@@ -1,0 +1,39 @@
+version: 0.2
+
+env:
+  variables:
+    FRONTEND_IMAGE_NAME: blynk-frontend
+    BACKEND_IMAGE_NAME: blynk-backend
+    AWS_REGION: ca-central-1
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 445567079138.dkr.ecr.$AWS_REGION.amazonaws.com)
+      - REPOSITORY_URI_FRONTEND=<your-account-id>.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_IMAGE_NAME
+      - REPOSITORY_URI_BACKEND=<your-account-id>.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_IMAGE_NAME
+      - echo REPOSITORY_URI_FRONTEND=$REPOSITORY_URI_FRONTEND
+      - echo REPOSITORY_URI_BACKEND=$REPOSITORY_URI_BACKEND
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+  build:
+    commands:
+      - echo Building the Docker images...
+      - docker build -t $FRONTEND_IMAGE_NAME ./frontend
+      - docker tag $FRONTEND_IMAGE_NAME:latest $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      - docker build -t $BACKEND_IMAGE_NAME ./backend
+      - docker tag $BACKEND_IMAGE_NAME:latest $REPOSITORY_URI_BACKEND:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_BACKEND:$IMAGE_TAG
+      - echo Writing image definitions...
+      - printf '[{"name":"frontend","imageUri":"%s"},{"name":"backend","imageUri":"%s"}]' $REPOSITORY_URI_FRONTEND:$IMAGE_TAG $REPOSITORY_URI_BACKEND:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
